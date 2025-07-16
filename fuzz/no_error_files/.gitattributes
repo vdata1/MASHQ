@@ -1,0 +1,4 @@
+all.json filter=lfs diff=lfs merge=lfs -text
+test262.json filter=lfs diff=lfs merge=lfs -text
+v8.json filter=lfs diff=lfs merge=lfs -text
+webkit.json filter=lfs diff=lfs merge=lfs -text

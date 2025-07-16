@@ -1,0 +1,10 @@
+Round 1: Total Sum = 419
+Round 2: Total Sum = 1028
+Round 3: Total Sum = 2044
+Round 4: Total Sum = 2848
+Round 5: Total Sum = 3971
+Round 6: Total Sum = 5286
+Round 7: Total Sum = 6653
+Round 8: Total Sum = 8044
+Round 9: Total Sum = 9562
+Round 10: Total Sum = 10341

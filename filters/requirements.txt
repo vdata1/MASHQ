@@ -1,0 +1,24 @@
+# Core dependencies
+spacy==3.7.2
+nltk==3.8.1
+
+# Additional dependencies
+numpy>=1.24.0  # Required by spaCy
+pandas>=2.1.0  # For data manipulation
+tqdm>=4.66.0   # For progress bars
+
+# Development dependencies
+black==23.11.0  # Code formatting
+pylint==3.0.2   # Code linting
+pytest==7.4.3   # Testing
+
+# Language models
+# After installing requirements, run:
+# python -m spacy download en_core_web_md
+# python -m nltk.downloader stopwords
+
+# Note: This project requires the following external runtimes:
+# - Node.js
+# - Deno
+# - Bun
+# These must be installed separately on your system. 
