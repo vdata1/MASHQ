@@ -10,7 +10,7 @@ The associated artifact describes how to run the tool and interpret the results.
 We performed the experiments described in the paper on a server with 64 Intel Xeon E5-4650L with 2.60GHz CPU cores and 768GB of memory, and on  12th Gen Intel Core-i9 2.40GHz CPU and 32GB of memory. However, MASHQ does not require specific hardware features, so it can successfully run on other hardware configurations. To replicate the experiments in the artifact, we run MASHQ against the latest versions of these three runtimes at the start of our study: v24.1.0 for Node.js, 2.3.3 for Deno, and 1.2.14 for Bun, on both Linux and Windows machines. However, we successfully run MASHQ in other setups, as well.
 
 ## Installation
-After cloning the repository, use npm to install all the third-party dependencies in `package.json` by running in the main folder of the project:
+After cloning the repository (please use git-lfs to do that), use npm to install all the third-party dependencies in `package.json` by running in the main folder of the project:
 ```shell
 npm --prefix . install .
 ```
