@@ -7,7 +7,6 @@
 
   var child = command.spawn();
   console.log("subprocess forked");
-
   await child.kill("SIGTERM");
   console.log("subprocess killed");
 })();
