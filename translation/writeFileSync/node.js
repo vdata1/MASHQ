@@ -1,5 +1,5 @@
 (function () {
-  const fs = require("node:fs");
+  var fs = require("node:fs");
   try {
     fs.writeFileSync("./NodeOutput.txt", "file written");
     fs.unlinkSync("./NodeOutput.txt");

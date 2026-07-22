@@ -6,22 +6,30 @@ var https = require('https');
     path: '/',
     method: 'GET'
   };
-  
-  var req = await https.request(options, (res) => {
-    let data = '';
-  
-    res.on('data', (chunk) => {
-      data += chunk;
+
+  try {
+    var data = await new Promise(function(resolve, reject) {
+      var req = https.request(options, function(res) {
+        var chunks = '';
+
+        res.on('data', function(chunk) {
+          chunks += chunk;
+        });
+
+        res.on('end', function() {
+          resolve(chunks);
+        });
+      });
+
+      req.on('error', function(e) {
+        reject(e);
+      });
+
+      req.end();
     });
-  
-    res.on('end', () => {
-      console.log('Response:', data);
-    });
-  });
-  
-  req.on('error', (e) => {
-    console.error(`Problem with request: ${e.message}`);
-  });
-  
-  req.end();
-})(); 
+
+    console.log('Response:', data);
+  } catch (error) {
+    console.error('Error:', error);
+  }
+})();

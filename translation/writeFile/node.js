@@ -1,4 +1,4 @@
-const fs = require("fs");
+var fs = require("fs");
 (async function () {
   try {
     await fs.writeFile("./NodeOutput.txt", "file written");

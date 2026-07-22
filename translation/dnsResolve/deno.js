@@ -5,6 +5,6 @@
             console.log(`IP Address ${index + 1}: ${address}`);
         });
     } catch (err) {
-      //  console.error('DNS resolution error:', err);
+       console.error('DNS resolution error:', err);
     }
 })();

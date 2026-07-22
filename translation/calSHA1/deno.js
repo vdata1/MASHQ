@@ -5,9 +5,8 @@ import * as crypto from "https://deno.land/std@0.119.0/hash/mod.ts";
   var data = encoder.encode(inputString);
   var hash = await crypto.createHash("sha1");
   hash.update(data);
-  //crypto.toHex(hash.digest());
   var digestBytes = hash.digest();
-  let hashHex = "";
+  var hashHex = "";
   for (var byte of digestBytes) {
     hashHex += byte.toString(16).padStart(2, "0");
   }

@@ -1,4 +1,4 @@
-(async function(){
-    var output = await Bun.$`pwd`.text();
-    console.log(output);    
+(async function () {
+  var output = await (Bun.$)`pwd`.text();
+  console.log(output);
 })();
