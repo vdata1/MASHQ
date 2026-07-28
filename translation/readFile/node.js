@@ -1,6 +1,9 @@
 var fs = require('fs');
 (async function(){
-fs.readFile('/etc/passwd', 'utf8', (err, data) => {
-  console.log(data);
-});
+  try {
+    var data = await fs.promises.readFile('/etc/passwd', 'utf8');
+    console.log(data);
+  } catch (err) {
+    console.error('Error:', err);
+  }
 })();

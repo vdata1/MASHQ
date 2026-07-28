@@ -1,7 +1,10 @@
 var { spawn } = require('child_process');
 (async function(){
-    var proc = await spawn("node", ["--version"]);
+    var proc = spawn("node", ["--version"]);
     console.log("subprocess forked");
-    await proc.kill('SIGINT');
+    proc.kill('SIGTERM');
+    await new Promise(function(resolve) {
+      proc.on('exit', resolve);
+    });
     console.log("subprocess killed");
 })();
