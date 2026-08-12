@@ -8,8 +8,9 @@ import threading
 import logging
 
 results = {}
-HARNESS = "../../harness/v8/harness.js" #"../../harness/test262/combined_harness_test262.js" #"../../harness/v8/harness.js" #"../../harness/webkit/ChakraCore" #"../../harness/test262/combined_harness_test262.js" #"../../harness/v8/harness.js"
+HARNESS = "../../harness/test262/combined_harness_test262.js" #"../../harness/v8/harness.js" #"../../harness/webkit/ChakraCore" #"../../harness/test262/combined_harness_test262.js" #"../../harness/v8/harness.js"
 BASEOUTPUTDIR = "./run_outputs"
+PREPAREDDIR = "./prepared_outputs"  # harness-prepended copies live here, originals are never modified
 
 
 def read_file(file_path):
@@ -90,16 +91,18 @@ def process_js_file(nodeTest, denoTest, bunTest, timeout=10):
     #test_name = nodeTest.split("_node.js")[0]
     threads = []
     outputs = {"node": "", "deno": "", "bun": ""}
-    
-    prepend_harness_and_imports(nodeTest, HARNESS)
-    prepend_harness_and_imports(denoTest, HARNESS)
-    prepend_harness_and_imports(bunTest, HARNESS)
+
+    # prepend_harness_and_imports no longer overwrites the original fuzz output;
+    # it writes a harness-prepended copy under PREPAREDDIR and returns that path.
+    node_prepared = prepend_harness_and_imports(nodeTest, HARNESS, "node")
+    deno_prepared = prepend_harness_and_imports(denoTest, HARNESS, "deno")
+    bun_prepared = prepend_harness_and_imports(bunTest, HARNESS, "bun")
 
 
     commands = {
-        "node": ["node", nodeTest],
-        "deno": ["deno", "run", "-A", "-r", denoTest],
-        "bun": ["bun", "run", bunTest]
+        "node": ["node", node_prepared],
+        "deno": ["deno", "run", "-A", "-r", deno_prepared],
+        "bun": ["bun", "run", bun_prepared]
     }
     
     # Create and start threads for each runtime
@@ -152,38 +155,101 @@ def process_and_run_files(base_dir):
             print(f"Results logged in {output_file_path}")
 
 
+# Matches the *first* line of an import statement, e.g.:
+#   import x from 'y';           import * as x from 'y';         import 'y';
+#   import x, { a, b } from 'y'; import {                        (multi-line named imports)
+_IMPORT_START_RE = re.compile(r'^\s*import\s')
+
+# Matches the first line of a require-based declaration, e.g.:
+#   const x = require('y');   let { a, b } = require('y')   var x = require('y')
+_REQUIRE_START_RE = re.compile(r'^\s*(?:const|let|var)\b.*=\s*require\s*\(')
+
+# Strips string-literal contents (single/double/backtick quoted) so bracket-counting
+# below doesn't get confused by braces/parens that merely appear inside a string.
+_STRING_LITERAL_RE = re.compile(r"""(['"`])(?:\\.|(?!\1).)*\1""", re.DOTALL)
+
+
+def _bracket_balance(line):
+    """Net change in {}/[]/() nesting depth contributed by this line, ignoring
+    anything inside string literals."""
+    stripped = _STRING_LITERAL_RE.sub('', line)
+    opens = stripped.count('{') + stripped.count('[') + stripped.count('(')
+    closes = stripped.count('}') + stripped.count(']') + stripped.count(')')
+    return opens - closes
+
+
 def extract_imports_and_requires(js_code_path):
     js_code = read_file(js_code_path)
 
     import_statements = []
-    
-    import_regex = r'^\s*(import\s.*?;\s*)'
-    require_regex = r'^\s*(const\s.*?=\s*require\(.*?\);\s*)'
-    
     lines = js_code.split('\n')
     new_code_lines = []
-    
-    for line in lines:
-        import_match = re.match(import_regex, line)
-        require_match = re.match(require_regex, line)
-        
-        if import_match:
-            import_statements.append(import_match.group(1))
-        elif require_match:
-            import_statements.append(require_match.group(1))
+
+    i = 0
+    n = len(lines)
+    while i < n:
+        line = lines[i]
+
+        if _IMPORT_START_RE.match(line) or _REQUIRE_START_RE.match(line):
+            # Accumulate lines until any opened brackets/braces/parens on the
+            # statement are balanced again (handles multi-line named imports /
+            # destructured requires), then also swallow a trailing ';' if the
+            # statement is terminated with one (many fuzzed files omit it, so
+            # this is optional rather than required).
+            statement_lines = [line]
+            balance = _bracket_balance(line)
+            j = i
+            while balance > 0 and j + 1 < n:
+                j += 1
+                statement_lines.append(lines[j])
+                balance += _bracket_balance(lines[j])
+
+            # If the statement ended without a semicolon on its own line but the
+            # next line starts one right after (e.g. `require('y')\n;`), pull it in.
+            if j + 1 < n and lines[j + 1].lstrip().startswith(';') and not statement_lines[-1].rstrip().endswith(';'):
+                j += 1
+                statement_lines.append(lines[j])
+
+            import_statements.append('\n'.join(statement_lines))
+            i = j + 1
         else:
             new_code_lines.append(line)
-    
+            i += 1
+
     return '\n'.join(new_code_lines), import_statements
 
-def prepend_harness_and_imports(js_code, harness_code):
+def prepend_harness_and_imports(js_code, harness_code, runtime):
+    """
+    Reads the original fuzz-output file at `js_code` and the harness, and writes a
+    harness-prepended copy to a mirrored path under PREPAREDDIR. The original file at
+    `js_code` is never modified. Returns the path to the newly written, runnable file.
+    """
     js_code_without_imports, js_imports = extract_imports_and_requires(js_code)
     harness_code_without_imports, harness_imports = extract_imports_and_requires(harness_code)
     
     all_imports = list(dict.fromkeys(js_imports + harness_imports))  
     
-    final_code = '\n'.join(all_imports) + '\n\n' + '/********Sart of Harness********/' + '\n\n' + harness_code_without_imports + '\n\n' + '/********End of Harness********/' + '\n\n' + js_code_without_imports
-    write_file(js_code, final_code)
+    #commented to replace it with import the harness code in the js_code
+    #final_code = '\n'.join(all_imports) + '\n\n' + '/********Sart of Harness********/' + '\n\n' + harness_code_without_imports + '\n\n' + '/********End of Harness********/' + '\n\n' + js_code_without_imports
+
+
+
+    if runtime == "node" or runtime == "bun": 
+        final_code = '\n'.join(all_imports) + '\n\n' + '/********Sart of Harness********/' + '\n\n' + "var assert = require('assert');" + '\n\n' + harness_code_without_imports + '\n\n' + '/********End of Harness********/' + '\n\n' + js_code_without_imports
+    elif runtime == "deno":
+        final_code = '\n'.join(all_imports) + '\n\n' + '/********Sart of Harness********/' + '\n\n' + "import * as assert from 'assert';" + '\n\n' + harness_code_without_imports + '\n\n' + '/********End of Harness********/' + '\n\n' + js_code_without_imports    
+
+    # Mirror the original relative path under PREPAREDDIR instead of overwriting js_code in place.
+    rel_path = os.path.relpath(js_code, start=".")
+    # Guard against paths that fall outside the current tree (e.g. absolute paths or ../ escapes)
+    # by stripping any leading ".." segments so everything still lands under PREPAREDDIR.
+    rel_path_parts = [p for p in rel_path.split(os.sep) if p not in ("..", "")]
+    out_path = os.path.join(PREPAREDDIR, *rel_path_parts)
+
+    create_dir(os.path.dirname(out_path))
+    write_file(out_path, final_code)
+
+    return out_path
 
 def create_dir(dir):
     if not os.path.exists(dir):
@@ -197,9 +263,7 @@ def main():
 
 if __name__ == "__main__":
     create_dir(BASEOUTPUTDIR)
+    create_dir(PREPAREDDIR)
     print("start running")
     main()
     print("done")
-
-
-
