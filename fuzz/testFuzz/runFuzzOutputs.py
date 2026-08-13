@@ -2,13 +2,29 @@ import os
 import json
 from collections import defaultdict
 import re
+import argparse
 
 import subprocess
 import threading
 import logging
 
 results = {}
-HARNESS = "../../harness/test262/combined_harness_test262.js" #"../../harness/v8/harness.js" #"../../harness/webkit/ChakraCore" #"../../harness/test262/combined_harness_test262.js" #"../../harness/v8/harness.js"
+
+# Default harness path, used unless --harness is passed on the command line.
+DEFAULT_HARNESS = "../../harness/test262/combined_harness_test262.js"
+# Other harnesses that have been used here in the past, kept for reference:
+#   "../../harness/v8/harness.js"
+#   "../../harness/webkit/ChakraCore"
+
+# Run modes for --run-mode:
+#   "matched"     (default) - each runtime runs its own test file: node tests on node,
+#                 deno tests on deno, bun tests on bun.
+#   "node-on-all" - the Node test file is run on all three runtimes (node, deno, bun),
+#                 to see how Deno and Bun handle Node-targeted tests.
+RUN_MODE_MATCHED = "matched"
+RUN_MODE_NODE_ON_ALL = "node-on-all"
+
+HARNESS = DEFAULT_HARNESS  # overwritten in main() from parsed CLI args
 BASEOUTPUTDIR = "./run_outputs"
 PREPAREDDIR = "./prepared_outputs"  # harness-prepended copies live here, originals are never modified
 
@@ -87,16 +103,24 @@ def run_command(command, output_dict, key, timeout=1):
         logging.error(f"{key} command {' '.join(command)} timed out after {timeout} seconds")
 
 # Function to process a single JavaScript file with all runtimes
-def process_js_file(nodeTest, denoTest, bunTest, timeout=10):
+def process_js_file(nodeTest, denoTest, bunTest, run_mode=RUN_MODE_MATCHED, timeout=10):
     #test_name = nodeTest.split("_node.js")[0]
     threads = []
     outputs = {"node": "", "deno": "", "bun": ""}
 
     # prepend_harness_and_imports no longer overwrites the original fuzz output;
     # it writes a harness-prepended copy under PREPAREDDIR and returns that path.
-    node_prepared = prepend_harness_and_imports(nodeTest, HARNESS, "node")
-    deno_prepared = prepend_harness_and_imports(denoTest, HARNESS, "deno")
-    bun_prepared = prepend_harness_and_imports(bunTest, HARNESS, "bun")
+    if run_mode == RUN_MODE_NODE_ON_ALL:
+        # Run the Node test file itself on all three runtimes, to see how Deno and
+        # Bun behave when handed a test that was written/targeted for Node.
+        node_prepared = prepend_harness_and_imports(nodeTest, HARNESS, "node")
+        deno_prepared = prepend_harness_and_imports(nodeTest, HARNESS, "deno")
+        bun_prepared = prepend_harness_and_imports(nodeTest, HARNESS, "bun")
+    else:
+        # Default "matched" behavior: each runtime runs its own corresponding test file.
+        node_prepared = prepend_harness_and_imports(nodeTest, HARNESS, "node")
+        deno_prepared = prepend_harness_and_imports(denoTest, HARNESS, "deno")
+        bun_prepared = prepend_harness_and_imports(bunTest, HARNESS, "bun")
 
 
     commands = {
@@ -117,14 +141,14 @@ def process_js_file(nodeTest, denoTest, bunTest, timeout=10):
 
     return outputs
 
-def run_js_file(runtimes, prefix):
+def run_js_file(runtimes, prefix, run_mode=RUN_MODE_MATCHED):
 
-    result = process_js_file(runtimes["node"], runtimes["deno"], runtimes["bun"])
+    result = process_js_file(runtimes["node"], runtimes["deno"], runtimes["bun"], run_mode=run_mode)
     print(f"Simulated result for {prefix} running {result}")  # Placeholder result
     return result
 
 # Function to process the collected JS files, run them, and log the results
-def process_and_run_files(base_dir):
+def process_and_run_files(base_dir, run_mode=RUN_MODE_MATCHED):
     grouped_files = get_js_files_by_rounds(base_dir)
     for index, key in grouped_files.items():
         print(index, ":", len(grouped_files[index])) 
@@ -140,7 +164,7 @@ def process_and_run_files(base_dir):
         round_dir_output_path = os.path.join(BASEOUTPUTDIR, round_name)
         create_dir(round_dir_output_path)
         for prefix, runtimes in files_by_prefix.items():
-            results = run_js_file(runtimes, prefix)
+            results = run_js_file(runtimes, prefix, run_mode=run_mode)
             counter = counter + 1 
             print("ROUND_NAME: ", round_name)
             # Log the results in a JSON file named after the prefix
@@ -244,7 +268,15 @@ def prepend_harness_and_imports(js_code, harness_code, runtime):
     # Guard against paths that fall outside the current tree (e.g. absolute paths or ../ escapes)
     # by stripping any leading ".." segments so everything still lands under PREPAREDDIR.
     rel_path_parts = [p for p in rel_path.split(os.sep) if p not in ("..", "")]
-    out_path = os.path.join(PREPAREDDIR, *rel_path_parts)
+
+    # Always tag the prepared filename with the runtime it was prepared for. This matters
+    # most in RUN_MODE_NODE_ON_ALL, where the *same* source file (the Node test) is prepared
+    # three times, once per runtime - without this, each prepend call would overwrite the
+    # previous runtime's prepared copy at the same mirrored path.
+    file_name = rel_path_parts[-1] if rel_path_parts else os.path.basename(js_code)
+    base_name, ext = os.path.splitext(file_name)
+    prepared_file_name = f"{base_name}.{runtime}{ext or '.js'}"
+    out_path = os.path.join(PREPAREDDIR, *rel_path_parts[:-1], prepared_file_name)
 
     create_dir(os.path.dirname(out_path))
     write_file(out_path, final_code)
@@ -256,14 +288,47 @@ def create_dir(dir):
             os.makedirs(dir)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run fuzz-generated JS test files across Node, Deno, and Bun."
+    )
+    parser.add_argument(
+        "--harness",
+        dest="harness",
+        default=DEFAULT_HARNESS,
+        help=(
+            "Path to the harness JS file to prepend to each test file before running it. "
+            f"Defaults to the test262 combined harness ({DEFAULT_HARNESS})."
+        ),
+    )
+    parser.add_argument(
+        "--run-mode",
+        dest="run_mode",
+        choices=[RUN_MODE_MATCHED, RUN_MODE_NODE_ON_ALL],
+        default=RUN_MODE_MATCHED,
+        help=(
+            f"'{RUN_MODE_MATCHED}' (default): run each runtime's own test file on that runtime "
+            "(node tests on node, deno tests on deno, bun tests on bun). "
+            f"'{RUN_MODE_NODE_ON_ALL}': run the Node test file on all three runtimes (node, deno, "
+            "bun), to see how Deno and Bun behave when given Node-targeted tests."
+        ),
+    )
+    return parser.parse_args()
+
+
 # Main function to handle execution
-def main():
+def main(args):
     base_dir = "./output"  # Change this to fuzz outputs
-    process_and_run_files(base_dir)
+    process_and_run_files(base_dir, run_mode=args.run_mode)
 
 if __name__ == "__main__":
+    args = parse_args()
+    HARNESS = args.harness
+
     create_dir(BASEOUTPUTDIR)
     create_dir(PREPAREDDIR)
     print("start running")
-    main()
+    print(f"harness: {HARNESS}")
+    print(f"run mode: {args.run_mode}")
+    main(args)
     print("done")
