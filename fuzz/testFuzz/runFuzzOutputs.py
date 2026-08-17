@@ -19,8 +19,10 @@ DEFAULT_HARNESS = "../../harness/test262/combined_harness_test262.js"
 # Run modes for --run-mode:
 #   "matched"     (default) - each runtime runs its own test file: node tests on node,
 #                 deno tests on deno, bun tests on bun.
-#   "node-on-all" - the Node test file is run on all three runtimes (node, deno, bun),
-#                 to see how Deno and Bun handle Node-targeted tests.
+#   "node-on-all" - the Node test file is harness-prepended exactly once (using Node's
+#                 own harness style) and that SAME single file is then run, unmodified,
+#                 on all three runtimes (node, deno, bun) - to see how Deno and Bun
+#                 behave when handed a test written for Node, as-is.
 RUN_MODE_MATCHED = "matched"
 RUN_MODE_NODE_ON_ALL = "node-on-all"
 
@@ -111,11 +113,14 @@ def process_js_file(nodeTest, denoTest, bunTest, run_mode=RUN_MODE_MATCHED, time
     # prepend_harness_and_imports no longer overwrites the original fuzz output;
     # it writes a harness-prepended copy under PREPAREDDIR and returns that path.
     if run_mode == RUN_MODE_NODE_ON_ALL:
-        # Run the Node test file itself on all three runtimes, to see how Deno and
-        # Bun behave when handed a test that was written/targeted for Node.
+        # Run the Node test file itself, unmodified/unadapted, on all three runtimes -
+        # to see how Deno and Bun behave when handed a test written for Node, as-is.
+        # We prepend the harness exactly once, using Node's own harness style (since
+        # this is a Node test), and point every runtime at that SAME prepared file -
+        # no per-runtime adaptation, no separate copies.
         node_prepared = prepend_harness_and_imports(nodeTest, HARNESS, "node")
-        deno_prepared = prepend_harness_and_imports(nodeTest, HARNESS, "deno")
-        bun_prepared = prepend_harness_and_imports(nodeTest, HARNESS, "bun")
+        deno_prepared = node_prepared
+        bun_prepared = node_prepared
     else:
         # Default "matched" behavior: each runtime runs its own corresponding test file.
         node_prepared = prepend_harness_and_imports(nodeTest, HARNESS, "node")
@@ -125,7 +130,7 @@ def process_js_file(nodeTest, denoTest, bunTest, run_mode=RUN_MODE_MATCHED, time
 
     commands = {
         "node": ["node", node_prepared],
-        "deno": ["deno", "run", "-A", "-r", deno_prepared],
+        "deno": ["deno", "run", "-A", "-r", "--unstable-detect-cjs",  deno_prepared],
         "bun": ["bun", "run", bun_prepared]
     }
     
@@ -309,8 +314,9 @@ def parse_args():
         help=(
             f"'{RUN_MODE_MATCHED}' (default): run each runtime's own test file on that runtime "
             "(node tests on node, deno tests on deno, bun tests on bun). "
-            f"'{RUN_MODE_NODE_ON_ALL}': run the Node test file on all three runtimes (node, deno, "
-            "bun), to see how Deno and Bun behave when given Node-targeted tests."
+            f"'{RUN_MODE_NODE_ON_ALL}': harness-prepend the Node test file exactly once, then run "
+            "that same unmodified file on all three runtimes (node, deno, bun), to see how Deno "
+            "and Bun behave when given a Node test as-is."
         ),
     )
     return parser.parse_args()
