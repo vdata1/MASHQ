@@ -130,7 +130,7 @@ def process_js_file(nodeTest, denoTest, bunTest, run_mode=RUN_MODE_MATCHED, time
 
     commands = {
         "node": ["node", node_prepared],
-        "deno": ["deno", "run", "-A", "-r", "--unstable-detect-cjs",  deno_prepared],
+        "deno": ["deno", "run", "-A", "-r", deno_prepared],
         "bun": ["bun", "run", bun_prepared]
     }
     
