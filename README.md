@@ -1,6 +1,6 @@
 # MASHQ: Fingerprinting and Exploiting JavaScript Backends 
-This repository contains the prototype used in the evaluation of our paper MASHQ: Differential Testing of JavaScript Runtimes.
-MASHQ is designed to apply differential testing against JavaScript runtimes. It requires an input corpus, consisting of several self-contained JavaScript files.
+This repository contains the prototype used in the evaluation of our paper MASHQ: Fingerprinting and Exploiting JavaScript Backends.
+MASHQ applies differential testing against JavaScript runtimes to find runtime fingerprints and discrepancies. It requires an input corpus, consisting of several self-contained JavaScript files.
 
 ## Artifact Availability 
 The associated artifact describes how to run the tool and interpret the results.
