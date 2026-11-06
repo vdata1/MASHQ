@@ -15,6 +15,38 @@ const estraverse = require('estraverse');
 
 const runtimes = ['node', 'deno', 'bun'];
 
+// --- Ablation harness (USENIX '27 revision) ---------------------------------
+// Operator set and weights are env-driven so an ablation cell can be run without
+// editing code. Defaults reproduce the paper's full configuration exactly:
+//   operators delete / inject_snippet / transfer at weights 0.20 / 0.20 / 0.60.
+// weightedRandom() normalizes by the weight sum, so dropping an operator from
+// MASHQ_OPS automatically renormalizes the remaining weights.
+//   MASHQ_OPS="delete,transfer"            -> no runtime-specific API injection
+//   MASHQ_OPS="inject_snippet"             -> inject-only
+//   MASHQ_OPS="delete,inject_snippet,transfer" (or unset) -> full / baseline
+//   MASHQ_WEIGHTS="0.20,0.20,0.60"         -> override weights, order matches MASHQ_OPS
+// See ablation/ABLATION.md for the full matrix and protocol.
+const DEFAULT_OPS = ['delete', 'inject_snippet', 'transfer'];
+const DEFAULT_WEIGHTS = [0.20, 0.20, 0.60];
+function ablationOps() {
+    const raw = (process.env.MASHQ_OPS || '').trim();
+    if (!raw) return { ops: DEFAULT_OPS, weights: DEFAULT_WEIGHTS };
+    const ops = raw.split(',').map(s => s.trim()).filter(Boolean);
+    const defaultByOp = Object.fromEntries(DEFAULT_OPS.map((o, i) => [o, DEFAULT_WEIGHTS[i]]));
+    let weights;
+    const rawW = (process.env.MASHQ_WEIGHTS || '').trim();
+    if (rawW) {
+        weights = rawW.split(',').map(s => parseFloat(s.trim()));
+    } else {
+        // Keep each operator's paper weight; weightedRandom renormalizes.
+        weights = ops.map(o => (o in defaultByOp ? defaultByOp[o] : 1.0));
+    }
+    console.log('[ablation] operators:', ops, 'weights:', weights);
+    return { ops, weights };
+}
+const ABLATION = ablationOps();
+// ----------------------------------------------------------------------------
+
 //const harnessFile = fs.readFileSync(HARNESS, 'utf-8');
 //const harnessFunctions = createAST(harnessFile); 
 //console.log("harnessFunctions gl: ", harnessFunctions);
@@ -424,8 +456,8 @@ function chooseAndMarkModification(ast, snippets, additionalTestAST, round){//, 
     //console.log("additional Snippet: ", addtionalSnippet); 
     global.gc();
 
-    const operations = ['delete', 'inject_snippet', 'transfer'];//, 'append'];
-    const weights = [0.20, 0.20, 0.60]//, 0.2]; //15,15,70
+    const operations = ABLATION.ops;   // env-driven; default ['delete','inject_snippet','transfer']
+    const weights = ABLATION.weights;   // env-driven; default [0.20,0.20,0.60]
     const modification = weightedRandom(operations, weights);
     console.log("Selected modification: ", modification)//, "  Operation: ", operation); 
     
