@@ -26,7 +26,7 @@ function collectFilesRecursively(dir) {
         if (stat && stat.isDirectory()) {
             results = results.concat(collectFilesRecursively(fullPath));
         } else{
-            if( workingFilesList["test"].indexOf(fullPath) >-1 || workingFilesList["v8"].indexOf(fullPath) >-1 || workingFilesList["test262"].indexOf(fullPath) >-1 || workingFilesList["webkit"].indexOf(fullPath) >-1 ){
+            if( workingFilesList["abillation"].indexOf(fullPath) >-1  || workingFilesList["test"].indexOf(fullPath) >-1 || workingFilesList["v8"].indexOf(fullPath) >-1 || workingFilesList["test262"].indexOf(fullPath) >-1 || workingFilesList["webkit"].indexOf(fullPath) >-1 ){
                 results.push(fullPath);
             }
         }
