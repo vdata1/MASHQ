@@ -304,7 +304,7 @@ function chooseAndMarkModification(ast, snippets, additionalTestAST, round){//, 
     //console.log("additional Snippet: ", addtionalSnippet); 
 
     const operations = ['delete', 'inject_snippet', 'transfer'];//, 'append'];
-    const weights = [0.40, 0.10, 0.50]//, 0.2];
+    const weights = [0.35, 0.30, 0.35]//, 0.2];
     const modification = weightedRandom(operations, weights);
     console.log("Selected modification: ", modification)//, "  Operation: ", operation); 
     

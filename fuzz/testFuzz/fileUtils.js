@@ -10,7 +10,6 @@ if (global.gc) {
 }
 
 
-
 // Helper function to collect all files recursively in a directory
 if (global.gc) {
             global.gc(); // run code with --expose-gc flag to trigger 
@@ -57,8 +56,8 @@ function readTestFiles(dirs, numTests = 'all') {
 
     //. console.log(testFiles_unshuffle);
     console.log(testFiles.length, " test files found");
+    console.log(testFiles);
     //console.log("Test files: ", testFiles);
-
 
     // Read the content of each test file
     const tests = testFiles.map(file => ({
@@ -98,7 +97,6 @@ function readFileIfExists(filepath) {
         throw new Error(`Expected file not found: ${filepath}`);
     }
 }
-
 
 // Parse to AST 
 function createAST(file){

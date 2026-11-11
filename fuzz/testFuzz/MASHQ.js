@@ -14,7 +14,7 @@ function splitIntoChunks(arr, chunkSize) {
 }
 
 // Main function to orchestrate fuzzing
-function fuzzParallel(testsDir, snippetsDir, rounds, outputDir, numProcesses, numTests) {
+function fuzzParallel(testsDir, snippetsDir, rounds, outputDir, numProcesses, numTests, mutations) {
     const tests = readTestFiles(testsDir,numTests);
     console.log(tests); 
     const snippets = readSnippetFiles(snippetsDir);
@@ -29,7 +29,7 @@ function fuzzParallel(testsDir, snippetsDir, rounds, outputDir, numProcesses, nu
         });
         //(path.join(__dirname, 'childFuzzer.js'));
 
-        child.send({ testChunk, snippets, rounds, outputDir, chunkId: index });
+        child.send({ testChunk, snippets, rounds, outputDir, mutations, chunkId: index });
 
         // Listen for completion messages from the child process
         child.on('message', (message) => {
@@ -86,6 +86,7 @@ function parseArgs(args) {
         rounds: 20,
         outputDir: './output',
         numProcesses: 1,
+        mutations : ['delete','transfer','inject_snippet'],
         numTests: 'all' // Default value for number of tests
     };
 
@@ -100,6 +101,7 @@ Options:
   -t <dirs>      Comma-separated list of test directories (default: "../../../test262/test")
   -s <dir>       Snippets directory (default: "../../translation")
   -r <rounds>    Number of rounds (default: 20)
+  -m <mutations> List of mutations (default: ["delete", "inject_snippet", "transfer"])
   -o <dir>       Output directory (default: "./output")
   -n <num>       Number of processes (default: 1)
   -N <num|all>   Number of tests per process or 'all' (default: all)
@@ -131,22 +133,23 @@ Options:
                 options.numTests = args[i + 1] ? (args[i + 1] === 'all' ? 'all' : Number(args[i + 1])) : options.numTests;
                 i++;
                 break;
+            case "-m": 
+                options.mutations = args[i + 1] ? args[i + 1].split(',') : options.mutations;
+                break; 
         }
     }
     return options;
 }
 
-const { testsDir, snippetsDir, rounds, outputDir, numProcesses, numTests } = parseArgs(args);
+const { testsDir, snippetsDir, rounds, outputDir, numProcesses, numTests, mutations } = parseArgs(args);
 
 // Usage: node main_multi_process.js -t "../../../test262/test,../../../v8/mjsunit" -s "../../translation" -r 20 -o "./output" -n 4 -N 100
-
-
 
 if (!fs.existsSync(outputDir))
     fs.mkdirSync(outputDir); 
 
 console.log(`Starting fuzzing with ${numProcesses} processes, ${rounds} rounds, and ${numTests} tests per process.`);
-fuzzParallel(testsDir, snippetsDir, rounds, outputDir, numProcesses, numTests);
+fuzzParallel(testsDir, snippetsDir, rounds, outputDir, numProcesses, numTests, mutations);
 console.log("done"); 
  
 //return null; 

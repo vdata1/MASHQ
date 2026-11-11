@@ -316,11 +316,11 @@ function applyModifications(ast, runtime) {
                     //console.log("Visited: ", operation);
                     try{
                         //console.log("node:  ", node);
-                      //  console.log("snippetAST: ", node._fuzzFlag.snippetAST[runtime]);
+                        //console.log("snippetAST: ", node._fuzzFlag.snippetAST[runtime]);
                         fuzzNodeIndex = parent.body.indexOf(node);
                         parent.body.splice(fuzzNodeIndex, 0, ...injectedSnippet.body)
                         addedSnippets.push(node._fuzzFlag.snippetAST[runtime]);
-                      //  console.log("fuzzNodeIndex: ", fuzzNodeIndex);
+                        //console.log("fuzzNodeIndex: ", fuzzNodeIndex);
                     }catch(err){
                         console.log("Error in: ", operation, "\n\n", err);
                     }
@@ -420,12 +420,12 @@ function injectSnippet(ast1, ast2, counter = 1){
 */
 
 // Choose a modification and mark the AST with flags, including snippet and merge information
-function chooseAndMarkModification(ast, snippets, additionalTestAST, round){//, operation=null) {
+function chooseAndMarkModification(ast, snippets, additionalTestAST, round, mutations){//, operation=null) {
     //console.log("additional Snippet: ", addtionalSnippet); 
     global.gc();
 
-    const operations = ['delete', 'inject_snippet', 'transfer'];//, 'append'];
-    const weights = [0.20, 0.20, 0.60]//, 0.2]; //15,15,70
+    const operations = mutations; //['delete', 'inject_snippet', 'transfer'];//, 'append'];
+    const weights = [0.35, 0.30, 0.35]//, 0.2]; //15,15,70
     const modification = weightedRandom(operations, weights);
     console.log("Selected modification: ", modification)//, "  Operation: ", operation); 
     
@@ -490,7 +490,7 @@ function stringify(obj){
 
 
 // Apply modifications across runtimes
-function applyModificationsAcrossRuntimes(tests, snippets, round, outputDir) {
+function applyModificationsAcrossRuntimes(tests, snippets, round, outputDir, mutations) {
     //if (global.gc) {
     //        global.gc(); // run code with --expose-gc flag to trigger 
     //    } else {
@@ -543,7 +543,7 @@ function applyModificationsAcrossRuntimes(tests, snippets, round, outputDir) {
                 //}
                 console.log("Try: ", i);
                 let breakFlag = 0;
-                const modASTInfo = chooseAndMarkModification(testAST, availableSnippets, additionalTestAST, round);//, operation=null);
+                const modASTInfo = chooseAndMarkModification(testAST, availableSnippets, additionalTestAST, round, mutations);//, operation=null);
                 const modAST = modASTInfo.newAST; 
                 const markLocationInfo = modASTInfo.markLocationInfo;
                 //console.log("markLocationInfo: ", markLocationInfo);
@@ -618,7 +618,7 @@ function createASTs(testsDir){
 }
 
 // Main fuzzing function
-function fuzz(testsDir, snippetsDir, rounds, outputDir) {
+function fuzz(testsDir, snippetsDir, rounds, outputDir, mutations) {
 
     let tests = createASTs(testsDir); //readTestFiles(testsDir);
     const snippets = snippetsDir; //readSnippetFiles(snippetsDir);
@@ -638,7 +638,7 @@ function fuzz(testsDir, snippetsDir, rounds, outputDir) {
         //console.log("Number of tests: ", tests.length); 
         if(tests.length>0){
             console.log(`Round ${round} Starts`)
-            newTests = applyModificationsAcrossRuntimes(tests, snippets, round, roundDir);
+            newTests = applyModificationsAcrossRuntimes(tests, snippets, round, roundDir, mutations);
             //console.log("Check tests: ", tests == newTests); 
             tests = newTests; 
             console.log("New round number of tests: ", tests.length); 

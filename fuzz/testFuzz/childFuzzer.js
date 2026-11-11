@@ -7,10 +7,10 @@ if (global.gc) {
             console.warn('Garbage collection is not exposed');
         }
 // Function to process a chunk of tests
-function processTestChunk({ testChunk, snippets, rounds, outputDir, chunkId }) {
+function processTestChunk({ testChunk, snippets, rounds, outputDir, mutations, chunkId }) {
     //for (let round = 1; round <= rounds; round++) {
         const roundDir = `${outputDir}/chunk_${chunkId}`;
-        fuzz(testChunk, snippets, rounds, roundDir);
+        fuzz(testChunk, snippets, rounds, roundDir, mutations);
     //}
 
     
