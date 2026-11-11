@@ -90,36 +90,57 @@ def main():
                     f"Value for {key!r} must be a list of nonempty path strings."
                 )
 
-            # Treat each list as a set, preserving its original order.
+            # Remove duplicate path strings while preserving order.
             unique_paths = list(dict.fromkeys(paths))
-            count = math.floor(len(unique_paths) * args.percentage / 100)
-            selected_paths = rng.sample(unique_paths, count)
 
-            print(f"{key}: selected {count} of {len(unique_paths)} files")
-            print("pathing")
-            for file_index, path_string in enumerate(selected_paths, start=1):
-                print("Path:", path_string)
+            # Calculate the target BEFORE filtering out missing files.
+            target_count = math.floor(
+                len(unique_paths) * args.percentage / 100
+            )
+
+            existing_files = []
+
+            for path_string in unique_paths:
                 source = Path(path_string)
                 #if not source.is_absolute():
-                #    print("Resolving relative path against base directory:", base_dir)
                 #    source = base_dir / source
-                #    print("Resolved path:", source)
                 source = source.resolve()
-                print("Resolved path:", source) 
-                if not source.is_file():
-                    raise ValueError(f"Selected file does not exist: {source}")
 
-                # Numbered groups and prefixes prevent filename collisions.
+                if source.is_file():
+                    existing_files.append(source)
+                else:
+                    print(f"Warning: skipping missing or non-file path: {source}")
+
+            # Sampling without replacement requires enough existing files.
+            if len(existing_files) < target_count:
+                raise ValueError(
+                    f"{key!r}: need {target_count} files "
+                    f"({args.percentage}% of {len(unique_paths)} paths), "
+                    f"but only {len(existing_files)} exist. "
+                    "Cannot maintain the requested sample size."
+                )
+
+            selected_files = rng.sample(existing_files, target_count)
+
+            print(
+                f"{key}: selected {target_count} files "
+                f"from {len(existing_files)} existing files "
+                f"({len(unique_paths)} original paths)"
+            )
+
+            for file_index, source in enumerate(selected_files, start=1):
                 destination = (
                     output_dir
                     / f"group_{group_index:04d}"
                     / f"{file_index:06d}_{source.name}"
                 )
+
                 if destination == source:
-                    raise ValueError(f"Cannot copy a file onto itself: {source}")
+                    raise ValueError(
+                        f"Cannot copy a file onto itself: {source}"
+                    )
 
                 copy_plan.append((source, destination))
-
         # All selected source files have been checked before copying begins.
         output_dir.mkdir(parents=True, exist_ok=True)
         copied_paths = []
